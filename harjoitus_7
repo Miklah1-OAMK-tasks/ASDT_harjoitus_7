@@ -1,0 +1,188 @@
+import tkinter as tk
+import random
+import winsound
+import threading
+import time
+import pygame
+
+# Pygamen alustus
+pygame.mixer.init()
+
+# Luodaan pääikkuna
+ikkuna = tk.Tk()
+ikkuna.title("Matkailu avartaa")
+ikkuna.geometry("1200x1000+1300+100")
+ikkuna.configure(bg='blue')  # Asetetaan taustaväri siniseksi (valtameri)
+
+# Lippumuuttuja säikeiden pysäyttämiseen
+ohjelma_kaynnissa = True
+
+# Listat, joihin tallennetaan saarten ja apinoiden tiedot
+saarten_tiedot = []
+apinoiden_tiedot = []
+apinoiden_aanet = set()
+
+# Funktio, joka tuottaa apinan ääntelyn 10 sekunnin välein ja tarkistaa kuoloriski
+def apinan_aantely(apina_id, saari_id, apinan_aani):
+    global saarten_tiedot
+    global apinoiden_tiedot
+    global apinoiden_aanet
+    apina_id = apina_id
+    while ohjelma_kaynnissa:
+        winsound.Beep(apinan_aani, 500)  # Äänen kesto 500 ms
+        print(f"Apina {apina_id} ääntelee saarella {saari_id}")
+        
+        # Tarkistetaan 1 % kuoloriski nauruun
+        if random.random() < 0.1:
+            # Soitetaan nauruääni ja poistetaan apina
+            pygame.mixer.music.load("aanet/laugh.wav")
+            pygame.mixer.music.play()
+            poista_apina(apina_id)
+            break  # Lopetetaan apinan säie, kun apina kuolee nauruun
+        
+        time.sleep(10)  # Odotetaan 10 sekuntia ennen seuraavaa ääntä
+
+# Funktio, joka lisää saaren
+def lisaa_saari():
+    global saarten_tiedot
+    global ohjelma_kaynnissa
+    ohjelma_kaynnissa = True
+    saari = tk.Canvas(ikkuna, width=150, height=150, bg='green', highlightthickness=0)
+    saaren_x = random.randint(0, 1050)
+    saaren_y = random.randint(50, 850)
+
+    # Varmistetaan, että uusi saari ei mene päällekkäin muiden kanssa
+    while onko_paallekkain(saaren_x, saaren_y):
+        saaren_x = random.randint(0, 1050)
+        saaren_y = random.randint(50, 850)
+
+    saari.place(x=saaren_x, y=saaren_y)
+    saari_label = tk.Label(ikkuna, text="Saari " + str(len(saarten_tiedot)+1), bg='green')
+    saari_label.place(x=saaren_x, y=saaren_y)
+    saarten_tiedot.append({
+        "saari_id": len(saarten_tiedot) + 1,  # Muutettu id:n aloitus numerosta 1
+        "saaren_x": saaren_x,
+        "saaren_y": saaren_y,
+        "saari": saari,
+        "apinoiden_lkm": 0,
+        "saari_label": saari_label
+    })
+    luo_apina(saari)
+    winsound.Beep(400, 200)
+    print("Saari lisätty")
+    print(saarten_tiedot)
+
+# Funktio, joka lisää 10 apinaa saarelle ja käynnistää jokaiselle apinalle oman säikeen
+def luo_apina(saari):   
+    global apinoiden_tiedot
+    global saarten_tiedot
+    global apinoiden_aanet
+    for i in range(10):
+        apina_id = len(apinoiden_tiedot)+1  # Luodaaan apinalle uniikki id
+        apina_x = random.randint(0, 140)  # Asetetaan apinalle satunnainen x-koordinaatti saaren sisällä
+        apina_y = random.randint(10, 140) # Asetetaan apinalle satunnainen y-koordinaatti saaren sisällä
+        apinan_kuva = saari.create_oval(apina_x, apina_y, apina_x+10, apina_y+10, fill='brown')  # Luodaan apinalle kuva
+        saari_id = len(saarten_tiedot)
+        apinan_aani = random.randint(400, 2000)
+        while apinan_aani in apinoiden_aanet:
+            apinan_aani = random.randint(400, 2000)
+        apinoiden_aanet.add(apinan_aani)
+        apinoiden_tiedot.append({
+            "apina_id": apina_id,
+            "saari_id": saari_id,
+            "saari": saari,
+            "apina_x": apina_x,
+            "apina_y": apina_y,
+            "apinan_kuva": apinan_kuva,
+            "apinan_aani": apinan_aani
+        })
+        # Käynnistetään säie jokaiselle apinalle
+        threading.Thread(target=apinan_aantely, args=(apina_id,saari_id , apinan_aani), daemon=True).start()
+        
+        saarten_tiedot[-1]["apinoiden_lkm"] += 1
+        print(apinoiden_tiedot)
+    print("10 apinaa lisätty saarelle")
+
+# Funktio tarkistaa, onko uusi saari päällekkäin olemassa olevien saarien kanssa
+def onko_paallekkain(saaren_x, saaren_y):
+    for saari_dict in saarten_tiedot:
+        vanha_x = saari_dict["saaren_x"]
+        vanha_y = saari_dict["saaren_y"]
+        if abs(saaren_x - vanha_x) < 200 and abs(saaren_y - vanha_y) < 200:
+            return True
+    return False
+
+# Luodaan funktio, joka tyhjentää meren saarista ja poistaa apinat
+def tyhjenna_meri():
+    global saarten_tiedot
+    global apinoiden_tiedot
+    global apinoiden_aanet
+    global ohjelma_kaynnissa
+    for saari_dict in saarten_tiedot:
+        saari_dict["saari"].destroy()
+        saari_dict["saari_label"].destroy()
+    saarten_tiedot = []
+    apinoiden_tiedot = []
+    apinoiden_aanet = set()
+    ohjelma_kaynnissa = False
+    print("Meri tyhjennetty")
+    print(saarten_tiedot)   
+    print(apinoiden_tiedot)
+    print(apinoiden_aanet)
+
+# Funktio, joka poistaa apinan saarelta
+def poista_apina(apina_id):
+    global apinoiden_tiedot
+    for apina in apinoiden_tiedot:
+        if apina["apina_id"] == apina_id:
+            # Poistetaan apinan kuva saarelta
+            saari = apina["saari"]  # Viitataan suoraan saareen apinan tiedoissa
+            saari.delete(apina["apinan_kuva"])
+            # Poistetaan apina tiedoista
+            apinoiden_tiedot.remove(apina)
+            print(f"Apina {apina_id} kuoli nauruun.")
+
+# Painikkeiden tyylit
+painikkeiden_tyyli = {
+    "bg": "#4CAF50",    # Taustaväri
+    "fg": "white",      # Tekstin väri
+    "font": ("Helvetica", 10, "bold"),
+    "activebackground": "#45a049", # Painikkeen aktivoitu väri
+    "activeforeground": "white",   # Painikkeen aktivoitu tekstin väri
+    "padx": 20,  # Lisätään tyhjää tilaa sivuille
+    "pady": 10,  # Lisätään tyhjää tilaa ylös ja alas
+    "width": 15  # Asetetaan painikkeille vakio leveys
+}
+
+# Luodaan painike, joka lisää saaren
+lisaa_saari_painike = tk.Button(ikkuna, text="Tulivuorenpurkaus", command=lisaa_saari, **painikkeiden_tyyli)
+# lisaa_saari_painike.place(x=0, y=0)
+lisaa_saari_painike.pack(side=tk.LEFT, anchor='n')
+
+# Luodaan painike, joka tyhjentää meren saarista
+tyhjenna_meri_painike = tk.Button(ikkuna, text="Tyhjennä meri", command=tyhjenna_meri, **painikkeiden_tyyli)
+tyhjenna_meri_painike.pack(side=tk.LEFT, anchor='n')
+
+# Luodaan painike, joka tulostaa vain apinoiden id:t
+apinoiden_id_painike = tk.Button(ikkuna, text="Apinoiden id:t", command=lambda: print([apina["apina_id"] for apina in apinoiden_tiedot]), **painikkeiden_tyyli)
+apinoiden_id_painike.pack(side=tk.LEFT, anchor='n')
+
+# Luodaan painike, joka tulostaa saarten tiedot
+saarten_tiedot_painike = tk.Button(ikkuna, text="Saarten tiedot", command=lambda: print(saarten_tiedot), **painikkeiden_tyyli)
+saarten_tiedot_painike.pack(side=tk.LEFT, anchor='n')
+
+# Luodaan painike, joka tulostaa apinoiden tiedot
+apinoiden_tiedot_painike = tk.Button(ikkuna, text="Apinoiden tiedot", command=lambda: print(apinoiden_tiedot), **painikkeiden_tyyli)
+apinoiden_tiedot_painike.pack(side=tk.LEFT, anchor='n')
+
+# Lopetusfunktio, joka pysäyttää säikeet ja sulkee ohjelman, kun ikkuna suljetaan
+def lopeta_ohjelma():
+    global ohjelma_kaynnissa
+    ohjelma_kaynnissa = False  # Asetetaan lippumuuttuja, jotta säikeet pysähtyvät
+    ikkuna.quit()  # Suljetaan pääikkuna
+
+# Käytetään `protocol`-metodia pysäyttämään säikeet ja sulkemaan ikkuna oikein
+ikkuna.protocol("WM_DELETE_WINDOW", lopeta_ohjelma)
+
+# Käynnistä ohjelma
+ikkuna.mainloop()
