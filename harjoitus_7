@@ -202,7 +202,7 @@ def poista_apina(apina_id):
                 saarten_tiedot[apina["saari_id"]-1]["apinoiden_lkm"] -= 1   
             apinoiden_tiedot.remove(apina) # Poistetaan apina apinoiden tiedoista
 
-# Funktio, joka siirtää yhden apinan saarelta merelle ja liikuttaa sitä suuntaan
+# Funktio, joka siirtää yhden apinan saarelta merelle ja liikuttaa sitä
 def laheta_apina_merelle_2():
     global apinoiden_tiedot, saarten_tiedot
 
@@ -286,6 +286,99 @@ def liikuta_apinaa_meressa_2(apina_id, suunta):
                     return  # Lopetetaan apinan liikuttaminen, jos apina menee meren ulkopuolelle
 
         time.sleep(0.5)  # Päivitysnopeus, joka määrittää liikkeen nopeuden
+        
+# Funktio, joka liikuttaa apinaa meressä annettuun suuntaan
+def apina_liikkuu_meressa(apina_id, suunta):
+    global apinoiden_tiedot, meri
+    nopeus = 5  # Apinan liikkumisnopeus (pikseliä per päivitys)
+    
+    # Apinan liikuttaminen merellä
+    while ohjelma_kaynnissa:
+        for apina in apinoiden_tiedot: 
+            if apina["apina_id"] == apina_id and apina["on_merella"]:   # Tarkistetaan, onko apina merellä
+                # Varmistetaan, että apinan kuva on olemassa
+                if not meri.coords(apina["apinan_kuva"]):               # Tarkistetaan, onko apinaa enää olemassa
+                    print(f"Apina {apina_id} ei enää ole meressä.")     # Tulostetaan viesti
+                    return  # Lopetetaan, jos apinaa ei ole meressä
+                
+                # Liikutetaan apinaa suuntaan
+                if suunta == "pohjoinen":
+                    meri.move(apina["apinan_kuva"], 0, -nopeus)  # Ylös
+                elif suunta == "itä":
+                    meri.move(apina["apinan_kuva"], nopeus, 0)  # Oikealle
+                elif suunta == "etelä":
+                    meri.move(apina["apinan_kuva"], 0, nopeus)  # Alas
+                elif suunta == "länsi":
+                    meri.move(apina["apinan_kuva"], -nopeus, 0)  # Vasemmalle
+                
+                # Tarkistetaan, osuuko apina toiselle saarelle
+                if tarkista_apinan_tormays_saarelle(apina_id):
+                    return  # Lopetetaan liike, kun apina osuu saarelle
+
+                # Tarkistetaan apinan sijainti (rajojen sisällä pysyminen)
+                apina_x, apina_y = meri.coords(apina["apinan_kuva"])[0:2]
+                if apina_x < -10 or apina_x > 1210 or apina_y < -10 or apina_y > 1210:
+                    print(f"Apina {apina_id} eksyi merelle!")
+                    return  # Lopetetaan, jos apina menee meren ulkopuolelle
+
+        time.sleep(0.05)  # Päivitysnopeus, joka määrittää liikkeen sujuvuuden
+
+# Funktio, joka päivittää saarella olevan apinoiden lukumäärän
+def paivita_apinoiden_maara_saarella(saari_id):
+    global saarten_tiedot
+    for saari in saarten_tiedot:
+        if saari["saari_id"] == saari_id:
+            # Päivitä saaren apinoiden lukumäärä labeliin
+            saari["saari_label"].config(text=f"S{saari_id} - Apinoita: {saari['apinoiden_lkm']}")
+            break
+
+# Funktio, joka lisää laiturit meren Canvasille, jos matkailu == True
+def lisaa_laiturit_saarelle(saari_id):
+    global saarten_tiedot
+    global meri
+    for saari in saarten_tiedot: 
+        if saari["saari_id"] == saari_id and saari["matkailu"]: # Tarkistetaan, onko matkailu päällä
+            saaren_x, saaren_y = saari["saaren_x"], saari["saaren_y"] # Saaren koordinaatit
+            
+            # Piirretään laiturit meren Canvasille, saaren ympärille
+            # Pohjoinen laituri (yläpuolella)
+            meri.create_rectangle(saaren_x + 70, saaren_y - 30, saaren_x + 80, saaren_y, fill='gray')
+            
+            # Eteläinen laituri (alapuolella)
+            meri.create_rectangle(saaren_x + 70, saaren_y + 150, saaren_x + 80, saaren_y + 180, fill='gray')
+            
+            # Itäinen laituri (oikealla)
+            meri.create_rectangle(saaren_x + 150, saaren_y + 70, saaren_x + 180, saaren_y + 80, fill='gray')
+            
+            # Läntinen laituri (vasemmalla)
+            meri.create_rectangle(saaren_x - 30, saaren_y + 70, saaren_x, saaren_y + 80, fill='gray')
+
+            print(f"Laiturit lisätty saarelle {saari_id}")
+            threading.Thread(target=apina_ui_merelle, args=(saari_id,), daemon=True).start()  # Käynnistetään apinoiden uiminen merelle säie
+            break
+
+# Funktio, joka käynnistää satunnaisen apinan uimaan saarelta, jos matkailu on True
+def apina_ui_merelle(saari_id):
+    global saarten_tiedot
+    global apinoiden_tiedot
+    global ohjelma_kaynnissa
+
+    while ohjelma_kaynnissa:
+        saari = next((s for s in saarten_tiedot if s["saari_id"] == saari_id), None) # Etsitään saari
+        if not saari or not saari["matkailu"]:
+            return  # Jos matkailu ei ole käytössä, ei tehdä mitään
+        
+        if saari["apinoiden_lkm"] > 0:
+            # Satunnaisesti valitaan apina, joka ei ole vielä merellä
+            apina = next((a for a in apinoiden_tiedot if a["saari_id"] == saari_id and not a["on_merella"]), None)
+            if apina:
+                # Lähetetään apina merelle
+                laheta_apina_merelle(saari_id)
+                # Soitetaan ääniefekti, kun apina lähtee uimaan
+                swim_sound.play()  # Toistetaan ääni
+
+        # Odotetaan 10 sekuntia ennen seuraavaa apinan uimista
+        time.sleep(10)
 
 # Funktio, joka siirtää yhden apinan saarelta merelle ja liikuttaa sitä suuntaan
 def laheta_apina_merelle(saari_id):
@@ -381,63 +474,6 @@ def apina_liikkuu_meressa(apina_id, suunta):
                     return  # Lopetetaan, jos apina menee meren ulkopuolelle
 
         time.sleep(0.05)  # Päivitysnopeus, joka määrittää liikkeen sujuvuuden
-
-# Funktio, joka päivittää saarella olevan apinoiden lukumäärän
-def paivita_apinoiden_maara_saarella(saari_id):
-    global saarten_tiedot
-    for saari in saarten_tiedot:
-        if saari["saari_id"] == saari_id:
-            # Päivitä saaren apinoiden lukumäärä labeliin
-            saari["saari_label"].config(text=f"S{saari_id} - Apinoita: {saari['apinoiden_lkm']}")
-            break
-
-# Funktio, joka lisää laiturit meren Canvasille, jos matkailu == True
-def lisaa_laiturit_saarelle(saari_id):
-    global saarten_tiedot
-    global meri
-    for saari in saarten_tiedot:
-        if saari["saari_id"] == saari_id and saari["matkailu"]:
-            saaren_x, saaren_y = saari["saaren_x"], saari["saaren_y"]
-            
-            # Piirretään laiturit meren Canvasille, saaren ympärille
-            # Pohjoinen laituri (yläpuolella)
-            meri.create_rectangle(saaren_x + 70, saaren_y - 30, saaren_x + 80, saaren_y, fill='gray')
-            
-            # Eteläinen laituri (alapuolella)
-            meri.create_rectangle(saaren_x + 70, saaren_y + 150, saaren_x + 80, saaren_y + 180, fill='gray')
-            
-            # Itäinen laituri (oikealla)
-            meri.create_rectangle(saaren_x + 150, saaren_y + 70, saaren_x + 180, saaren_y + 80, fill='gray')
-            
-            # Läntinen laituri (vasemmalla)
-            meri.create_rectangle(saaren_x - 30, saaren_y + 70, saaren_x, saaren_y + 80, fill='gray')
-
-            print(f"Laiturit lisätty saarelle {saari_id}")
-            threading.Thread(target=apina_ui_merelle, args=(saari_id,), daemon=True).start()  # Käynnistetään automaattinen apinoiden uiminen saarelta
-            break
-
-# Funktio, joka käynnistää satunnaisen apinan uimaan saarelta, jos matkailu on True
-def apina_ui_merelle(saari_id):
-    global saarten_tiedot
-    global apinoiden_tiedot
-    global ohjelma_kaynnissa
-
-    while ohjelma_kaynnissa:
-        saari = next((s for s in saarten_tiedot if s["saari_id"] == saari_id), None)
-        if not saari or not saari["matkailu"]:
-            return  # Jos matkailu ei ole käytössä, ei tehdä mitään
-        
-        if saari["apinoiden_lkm"] > 0:
-            # Satunnaisesti valitaan apina, joka ei ole vielä merellä
-            apina = next((a for a in apinoiden_tiedot if a["saari_id"] == saari_id and not a["on_merella"]), None)
-            if apina:
-                # Lähetetään apina merelle
-                laheta_apina_merelle(saari_id)
-                # Soitetaan ääniefekti, kun apina lähtee uimaan
-                swim_sound.play()  # Toistetaan ääni
-
-        # Odotetaan 10 sekuntia ennen seuraavaa apinan uimista
-        time.sleep(10)
 
 # Funktio, joka tarkistaa, osuuko apina saarelle uidessaan
 def tarkista_apinan_tormays_saarelle(apina_id):
