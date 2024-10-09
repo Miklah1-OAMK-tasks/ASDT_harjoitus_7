@@ -7,109 +7,125 @@ import pygame
 
 # Pygamen alustus
 pygame.mixer.init()
+shark_sound = pygame.mixer.Sound("aanet/shark.wav")
+swim_sound = pygame.mixer.Sound("aanet/swim.wav")
+volcano_sound = pygame.mixer.Sound("aanet/volcano.wav")
+laugh_sound = pygame.mixer.Sound("aanet/laugh.wav")
 
 # Luodaan pääikkuna
 ikkuna = tk.Tk()
 ikkuna.title("Matkailu avartaa")
 ikkuna.geometry("1200x1200+1300+100")
-ikkuna.configure(bg='blue')  # Asetetaan taustaväri siniseksi
+ikkuna.configure(bg='lightblue')  # Asetetaan taustaväri siniseksi
 
 # Luodaan Canvas merta varten
-meri = tk.Canvas(ikkuna, width=1200, height=1150, bg='blue', highlightthickness=0)
-meri.pack(side=tk.BOTTOM)  # Sijoitetaan Canvas-alue ikkunan alalaitaan (merialue)
+meri = tk.Canvas(ikkuna, width=1200, height=1160, bg='blue', highlightthickness=0)
+meri.pack(side=tk.BOTTOM)  # Sijoitetaan merialue ikkunan alalaitaan
 
 # Lippumuuttuja säikeiden pysäyttämiseen
 ohjelma_kaynnissa = True
 
 # Listat, joihin tallennetaan saarten ja apinoiden tiedot
-saarten_tiedot = []
-apinoiden_tiedot = []
-apinoiden_aanet = set()
+saarten_tiedot = []      # Lista saarten tiedoista
+apinoiden_tiedot = []    # Lista apinoiden tiedoista
+apinoiden_aanet = set()  # Lista apinoiden äänistä
+nauruun_kuolleet = set() # Apinat, jotka ovat kuolleet nauruun
+hain_syomat = set()      # Apinat, jotka ovat joutuneet hain saaliiksi
+eksyneet_apinat = set()  # Apinat, jotka ovat eksyneet merellä
+
+# Labelit, jotka näyttävät hain syömät, nauruun kuolleet ja eksyneet apinat
+nauruun_kuolleet_label = tk.Label(meri, text=f"Nauruun kuolleet apinat: {len(nauruun_kuolleet)}", bg='lightblue')
+nauruun_kuolleet_label.place(x=0, y=0)
+hain_syomat_label = tk.Label(meri, text=f"Hain syömät apinat: {len(hain_syomat)}", bg='lightblue')
+hain_syomat_label.place(x=0, y=20)
+eksyneet_apinat_label = tk.Label(meri, text=f"Eksyneet apinat: {len(eksyneet_apinat)}", bg='lightblue')
+eksyneet_apinat_label.place(x=0, y=40)
 
 # Funktio, joka lisää saaren
 def lisaa_saari():
-    global saarten_tiedot
-    global ohjelma_kaynnissa
-    ohjelma_kaynnissa = True
-    saari = tk.Canvas(meri, width=150, height=150, bg='green', highlightthickness=0)
-    saaren_x = random.randint(0, 1050)
-    saaren_y = random.randint(50, 850)
-    apinoiden_lkm = 0
+    global saarten_tiedot       # Otetaan käyttöön globaali muuttuja saarten_tiedot
+    global ohjelma_kaynnissa    # Otetaan käyttöön globaali muuttuja ohjelma_kaynnissa
+    ohjelma_kaynnissa = True    # Asetetaan ohjelma käyntiin
+    saari = tk.Canvas(meri, width=150, height=150, bg='green', highlightthickness=0) # Luodaan saari
+    saaren_x = random.randint(0, 1050) # Asetetaan saarelle satunnainen x-koordinaatti
+    saaren_y = random.randint(50, 850) # Asetetaan saarelle satunnainen y-koordinaatti
+    apinoiden_lkm = 0 # Alustetaan apinoiden lukumäärä nollaksi
 
     # Varmistetaan, että uusi saari ei mene päällekkäin muiden kanssa
-    while onko_paallekkain(saaren_x, saaren_y):
-        saaren_x = random.randint(0, 1050)
-        saaren_y = random.randint(50, 850)
+    while onko_saaret_paallekkain(saaren_x, saaren_y): # Kutsutaan onko_paallekkain-funktiota ja annetaan sille saaren koordinaatit
+        saaren_x = random.randint(0, 1050) # Arvotaan uusi x-koordinaatti, jos saari menee päällekkäin
+        saaren_y = random.randint(50, 850) # Arvotaan uusi y-koordinaatti, jos saari menee päällekkäin
 
-    saari.place(x=saaren_x, y=saaren_y)
-    saari_label = tk.Label(meri, text="S" + str(len(saarten_tiedot)+1), bg='green')
-    saari_label.place(x=saaren_x, y=saaren_y)
+    saari.place(x=saaren_x, y=saaren_y) # Sijoitetaan saari merelle
+    saari_label = tk.Label(meri, text="S" + str(len(saarten_tiedot)+1), bg='green') # Luodaan saaren label
+    saari_label.place(x=saaren_x, y=saaren_y) # Sijoitetaan saaren label saaren päälle
     
-    # Alustetaan saari ja lisätään tiedot
-    saarten_tiedot.append({
-        "saari_id": len(saarten_tiedot) + 1,  # Muutettu id:n aloitus numerosta 1
-        "saaren_x": saaren_x,
-        "saaren_y": saaren_y,
-        "saari": saari,
-        "apinoiden_lkm": apinoiden_lkm,
-        "saari_label": saari_label,
-        "matkailu": False  # Oletuksena matkailu on False
+    # Alustetaan saari ja lisätään tiedot saarten_tiedot-listaan
+    saarten_tiedot.append({ 
+        "saari_id": len(saarten_tiedot) + 1,    # Saaren id
+        "saaren_x": saaren_x,                   # Saaren x-koordinaatti
+        "saaren_y": saaren_y,                   # Saaren y-koordinaatti
+        "saari": saari,                         # Saaren kuva
+        "apinoiden_lkm": apinoiden_lkm,         # Apinoiden lukumäärä saarella
+        "saari_label": saari_label,             # Saaren label
+        "matkailu": False                       # Oletuksena matkailu on False
     })
-    luo_apina(saari)  # Lisätään saarelle 10 apinaa
-    winsound.Beep(400, 200)
+    luo_apina(saari)                            # Lisätään saarelle 10 apinaa
+    volcano_sound.play()                        # Toistetaan tulivuoren ääni
     print("Saari lisätty")
-    print(saarten_tiedot)
+    if len(saarten_tiedot) == 1: 
+        saarten_tiedot[0]["matkailu"] = True    # Ensimmäinen saari on matkailusaari
+
+# Funktio tarkistaa, onko uusi saari päällekkäin olemassa olevien saarien kanssa
+def onko_saaret_paallekkain(saaren_x, saaren_y):   # Funktio saa parametreikseen saaren x- ja y-koordinaatit
+    for saari_dict in saarten_tiedot:       # Käydään läpi kaikki saaret
+        vanha_x = saari_dict["saaren_x"]    # Otetaan talteen vanhan saaren x-koordinaatti
+        vanha_y = saari_dict["saaren_y"]    # Otetaan talteen vanhan saaren y-koordinaatti
+        if abs(saaren_x - vanha_x) < 200 and abs(saaren_y - vanha_y) < 200: # Jos uusi saari on liian lähellä vanhaa saarta
+            return True # Palautetaan True
+    return False # Palautetaan False, jos uusi saari ei ole päällekkäin muiden saarten kanssa
 
 # Funktio, joka lisää 10 apinaa saarelle ja käynnistää jokaiselle apinalle oman säikeen
 def luo_apina(saari):   
-    global apinoiden_tiedot
-    global saarten_tiedot
-    global apinoiden_aanet
-    for i in range(10):
-        apina_id = len(apinoiden_tiedot)+1  # Luodaaan apinalle uniikki id
-        apina_x = random.randint(0, 140)  # Asetetaan apinalle satunnainen x-koordinaatti saaren sisällä
-        apina_y = random.randint(10, 140) # Asetetaan apinalle satunnainen y-koordinaatti saaren sisällä
-        apinan_kuva = saari.create_oval(apina_x, apina_y, apina_x+10, apina_y+10, fill='brown')  # Luodaan apinalle kuva
-        saari_id = len(saarten_tiedot)
-        apinan_aani = random.randint(400, 2000)
-        while apinan_aani in apinoiden_aanet:
-            apinan_aani = random.randint(400, 2000)
-        apinoiden_aanet.add(apinan_aani)
-        apinoiden_tiedot.append({
-            "apina_id": apina_id,
-            "saari_id": saari_id,
-            "saari": saari,
-            "apina_x": apina_x,
-            "apina_y": apina_y,
-            "apinan_kuva": apinan_kuva,
-            "apinan_aani": apinan_aani,
-            "on_merella": False
-        })
-        # Käynnistetään säie jokaiselle apinalle
-        threading.Thread(target=apinan_aantely, args=(apina_id,saari_id , apinan_aani), daemon=True).start()
-        
-        saarten_tiedot[-1]["apinoiden_lkm"] += 1
-        paivita_apinoiden_maara_saarella(saari_id)  # Päivitetään visuaalisesti saarella oleva apinoiden lukumäärä
-        print(apinoiden_tiedot)
-    print("10 apinaa lisätty saarelle")
-
-# Funktio tarkistaa, onko uusi saari päällekkäin olemassa olevien saarien kanssa
-def onko_paallekkain(saaren_x, saaren_y):
-    for saari_dict in saarten_tiedot:
-        vanha_x = saari_dict["saaren_x"]
-        vanha_y = saari_dict["saaren_y"]
-        if abs(saaren_x - vanha_x) < 200 and abs(saaren_y - vanha_y) < 200:
-            return True
-    return False
-
-# Funktio, joka tuottaa apinan ääntelyn 10 sekunnin välein ja tarkistaa kuoloriski
-def apinan_aantely(apina_id, saari_id, apinan_aani):
-    global saarten_tiedot
-    global apinoiden_tiedot
-    global apinoiden_aanet
-    apina_id = apina_id
-    aika_merella = 0  # Ajastin merellä olemista varten
+    # Otetaan käyttöön globaalit muuttujat
+    global apinoiden_tiedot, saarten_tiedot, apinoiden_aanet
     
+    for i in range(10): # Lisätään 10 apinaa saarelle
+        apina_id = len(apinoiden_tiedot)+1  # Luodaaan apinalle uniikki id alkaen numerosta 1
+        apina_x = random.randint(0, 140)    # Asetetaan apinalle satunnainen x-koordinaatti saaren sisällä
+        apina_y = random.randint(10, 140)   # Asetetaan apinalle satunnainen y-koordinaatti saaren sisällä
+        apinan_kuva = saari.create_oval(apina_x, apina_y, apina_x+10, apina_y+10, fill='brown')  # Luodaan apinalle kuva
+        saari_id = len(saarten_tiedot)              # Tallennetaan saaren id
+        apinan_aani = random.randint(400, 2000)     # Arvotaan apinalle ääni väliltä 400-2000 Hz
+        while apinan_aani in apinoiden_aanet:       # Tarkistetaan, ettei ääni ole jo käytössä
+            apinan_aani = random.randint(400, 2000) # Arvotaan uusi ääni, jos se on jo käytössä
+        apinoiden_aanet.add(apinan_aani)            # Lisätään apinan ääni äänien joukkoon
+        # Lisätään apina apinoiden tiedot -listaan
+        apinoiden_tiedot.append({
+            "apina_id": apina_id,       # Tallennetaan apinan id
+            "saari_id": saari_id,       # Tallennetaan saaren id
+            "saari": saari,             # Tallennetaan saaren kuva
+            "apina_x": apina_x,         # Tallennetaan apinan x-koordinaatti
+            "apina_y": apina_y,         # Tallennetaan apinan y-koordinaatti
+            "apinan_kuva": apinan_kuva, # Tallennetaan apinan kuva
+            "apinan_aani": apinan_aani, # Tallennetaan apinan ääni
+            "on_merella": False         # Alustetaan apina saarella olevaksi
+        })
+        # Käynnistetään jokaiselle apinalle oma säie, joka tuottaa apinan ääntelyä
+        threading.Thread(target=apinan_aantely, args=(apina_id, saari_id, apinan_aani), daemon=True).start()
+        
+        saarten_tiedot[-1]["apinoiden_lkm"] += 1    # Lisätään apinoiden lukumäärää saarella
+        paivita_apinoiden_maara_saarella(saari_id)  # Päivitetään visuaalisesti saarella oleva apinoiden lukumäärä
+    print("10 apinaa lisätty saarelle")             # Tulostetaan viesti
+
+# Funktio, joka tuottaa apinan ääntelyn 10 sekunnin välein ja tarkistaa kuoloriskin
+def apinan_aantely(apina_id, saari_id, apinan_aani):
+    # Otetaan käyttöön globaalit muuttujat
+    global saarten_tiedot, apinoiden_tiedot, apinoiden_aanet, hain_syomat, nauruun_kuolleet
+    apina_id = apina_id # Tallenneetaan apinan id
+    aika_merella = 0    # Alustetaan ajastin merellä olemista varten
+    
+    # Apinan ääntely ja riski kuolla hain saaliiksi tai nauruun
     while ohjelma_kaynnissa:
         # Tarkista apinan sijainti ja määritä onko se merellä vai saarella
         for apina in apinoiden_tiedot:
@@ -117,41 +133,43 @@ def apinan_aantely(apina_id, saari_id, apinan_aani):
                 if apina["on_merella"] ==True:
                     # Apina on merellä, riski tulla syödyksi hain toimesta 1 sekunnin välein
                     aika_merella += 1
-                    if random.random() < 0.01:  # 1 % riski joka sekunti
+                    if random.random() < 0.01:      # 1 % riski joka sekunti
                         print(f"Apina {apina_id} joutui hain saaliiksi!")
-                        pygame.mixer.music.load("aanet/shark.wav")  # Ladataan hain hyökkäysääni
-                        pygame.mixer.music.play()  # Toistetaan ääni
-                        poista_apina(apina_id)  # Poistetaan apina pelistä
-                        return  # Lopetetaan säie, kun apina on syöty
-                    time.sleep(1)  # Tarkistetaan uudelleen 1 sekunnin välein
+                        shark_sound.play()          # Toistetaan hain ääni
+                        hain_syomat.add(apina_id)   # Lisätään syödyt apinat joukkoon
+                        paivita_labelit()           # Päivitetään syötyjen apinoiden lukumäärä
+                        poista_apina(apina_id)      # Poistetaan apina pelistä
+                        return                      # Lopetetaan säie, kun apina on syöty
+                    time.sleep(1)                   # Tarkistetaan uudelleen 1 sekunnin välein
                     
                 else:
                     # Apina on saarella, riski kuolla nauruun 10 sekunnin välein
                     winsound.Beep(apinan_aani, 100)  # Apina ääntelee 10 sekunnin välein
                     print(f"Apina {apina_id} ääntelee saarella {saari_id}")
-                    
-                    if random.random() < 0.01:  # 1 % riski joka 10 sekunti
+                    if random.random() < 0.01:  # 1 % riski kuolla joka 10 sekunti
                         print(f"Apina {apina_id} kuoli nauruun!")
-                        pygame.mixer.music.load("aanet/laugh.wav")  # Ladataan nauruääni
-                        pygame.mixer.music.play()  # Toistetaan nauruääni
-                        poista_apina(apina_id)  # Poistetaan apina pelistä
-                        return  # Lopetetaan säie, kun apina kuolee nauruun
-                    time.sleep(10)  # Toistetaan uudelleen 10 sekunnin välein
+                        laugh_sound.play()              # Toistetaan nauruääni kun apina kuolee
+                        nauruun_kuolleet.add(apina_id)  # Lisätään kuolleet apinat joukkoon
+                        paivita_labelit()               # Päivitetään nauruun kuolleiden apinoiden lukumäärä
+                        poista_apina(apina_id)          # Poistetaan apina
+                        paivita_apinoiden_maara_saarella(saari_id) # Päivitetään visuaalisesti saarella oleva apinoiden lukumäärä
+                        return                          # Lopetetaan säie, kun apina kuolee nauruun
+                    time.sleep(10)                      # Toistetaan uudelleen 10 sekunnin välein
+    # Lopetetaan säie, kun ohjelma ei ole enää käynnissä
+    print(f"Apina {apina_id} lopetti ääntelyn")
+    return
                     
 # Luodaan funktio, joka tyhjentää meren saarista ja poistaa apinat
 def tyhjenna_meri():
-    global saarten_tiedot
-    global apinoiden_tiedot
-    global apinoiden_aanet
-    global ohjelma_kaynnissa
-    global meri
+    # Otetaan käyttöön globaalit muuttujat
+    global saarten_tiedot, apinoiden_tiedot, apinoiden_aanet, ohjelma_kaynnissa, meri, hain_syomat, nauruun_kuolleet, eksyneet_apinat
 
     # Poistetaan kaikki apinat mereltä ja saarelta
     for apina in apinoiden_tiedot:
         if apina.get("on_merella", False):
-            meri.delete(apina["apinan_kuva"])  # Poistetaan apinan kuva mereltä
+            meri.delete(apina["apinan_kuva"])           # Poistetaan apinan kuva mereltä
         else:
-            apina["saari"].delete(apina["apinan_kuva"])  # Poistetaan apinan kuva saarelta
+            apina["saari"].delete(apina["apinan_kuva"]) # Poistetaan apinan kuva saarelta
 
     # Poistetaan kaikki saaret
     for saari_dict in saarten_tiedot:
@@ -160,16 +178,16 @@ def tyhjenna_meri():
     # Poistetaan laiturit
     meri.delete("all")
 
-    # Tyhjennetään tiedot
+    # Tyhjennetään kaikki listat ja asetetaan ohjelma pois päältä
     saarten_tiedot = []
     apinoiden_tiedot = []
     apinoiden_aanet = set()
+    hain_syomat = set()
+    nauruun_kuolleet = set() 
+    eksyneet_apinat = set()
     ohjelma_kaynnissa = False
-
-    print("Meri tyhjennetty")
-    print(saarten_tiedot)
-    print(apinoiden_tiedot)
-    print(apinoiden_aanet)
+    paivita_labelit()           # Päivitetään labelit
+    print("Meri tyhjennetty")   # Tulostetaan viesti
 
 # Funktio, joka poistaa apinan saarelta
 def poista_apina(apina_id):
@@ -183,6 +201,91 @@ def poista_apina(apina_id):
                 apina["saari"].delete(apina["apinan_kuva"])
                 saarten_tiedot[apina["saari_id"]-1]["apinoiden_lkm"] -= 1   
             apinoiden_tiedot.remove(apina) # Poistetaan apina apinoiden tiedoista
+
+# Funktio, joka siirtää yhden apinan saarelta merelle ja liikuttaa sitä suuntaan
+def laheta_apina_merelle_2():
+    global apinoiden_tiedot, saarten_tiedot
+
+    for saari in saarten_tiedot:        # Käydään läpi kaikki saaret
+        saari_id = saari["saari_id"]    # Tallennetaan saaren id
+        
+        # Tarkistetaan, onko saarella apinoita
+        if saari["apinoiden_lkm"] == 0:
+            print(f"Saarella {saari_id} ei ole enää apinoita siirrettäväksi.")
+            continue  # Siirrytään seuraavaan saareen
+        
+        # Etsi ensimmäinen apina, joka on kyseisellä saarella ja ei vielä merellä
+        apina = next((a for a in apinoiden_tiedot if a["saari_id"] == saari_id and not a.get("on_merella", False)), None)
+        if apina:
+            # Satunnaisesti valitaan saaren reunalta poistumissuunta: pohjoinen, etelä, itä tai länsi
+            suunta = random.choice(["pohjoinen", "itä", "etelä", "länsi"])
+            saaren_x, saaren_y = saari["saaren_x"], saari["saaren_y"]  # Tallennetaan saaren koordinaatit
+            
+            if suunta == "pohjoinen": 
+                apina_x = saaren_x + random.randint(0, 140) # Arvotaan apinan x-koordinaatti 
+                apina_y = saaren_y - 20 # Vähennetään y-koordinaatista, jotta apina siirtyy saaren yläpuolelle
+            elif suunta == "itä":
+                apina_x = saaren_x + 160 # Lisätään x-koordinaattiin, jotta apina siirtyy saaren oikealle puolelle
+                apina_y = saaren_y + random.randint(0, 140) # Arvotaan apinan y-koordinaatti
+            elif suunta == "etelä":
+                apina_x = saaren_x + random.randint(0, 140) # Arvotaan apinan x-koordinaatti
+                apina_y = saaren_y + 160 # Lisätään y-koordinaattiin, jotta apina siirtyy saaren alapuolelle
+            elif suunta == "länsi":
+                apina_x = saaren_x - 20 # Vähennetään x-koordinaatista, jotta apina siirtyy saaren vasemmalle puolelle
+                apina_y = saaren_y + random.randint(0, 140) # Arvotaan apinan y-koordinaatti
+            
+            # Poistetaan apinan kuva saarelta
+            saari_canvas = apina["saari"]               # Viitataan apinan saareen
+            saari_canvas.delete(apina["apinan_kuva"])   # Poistetaan apinan kuva saarelta
+            
+            # Piirretään apina merelle
+            apinan_kuva = meri.create_oval(apina_x, apina_y, apina_x+10, apina_y+10, fill='brown')  # Luodaan apinalle kuva
+            apina["apinan_kuva"] = apinan_kuva                      # Tallennetaan apinan kuva
+            apina["apina_x"], apina["apina_y"] = apina_x, apina_y   # Päivitetään apinan sijainti
+            apina["on_merella"] = True                              # Merkitään apina merellä olevaksi
+            
+            # Vähennetään apinoiden lukumäärää saarella
+            saari["apinoiden_lkm"] -= 1
+            paivita_apinoiden_maara_saarella(saari_id)  # Päivitetään saarella oleva apinoiden lukumäärä
+            
+            # Liikuta apinaa meressä
+            threading.Thread(target=liikuta_apinaa_meressa_2, args=(apina["apina_id"], suunta), daemon=True).start()
+
+            print(f"Apina {apina['apina_id']} lähetetty merelle saarelta {saari_id}, suunta: {suunta}. Apinoita jäljellä saarella: {saari['apinoiden_lkm']}")
+
+# Funktio, joka liikuttaa apinaa meressä annettuun suuntaan
+def liikuta_apinaa_meressa_2(apina_id, suunta):
+    global apinoiden_tiedot, meri, eksyneet_apinat
+    nopeus = 5  # Apinan liikkumisnopeus (pikseliä per päivitys)
+    
+    # Apinan liikuttaminen merellä
+    while ohjelma_kaynnissa:
+        for apina in apinoiden_tiedot:                                  # Käydään läpi kaikki apinat
+            if apina["apina_id"] == apina_id and apina["on_merella"]:   # Tarkistetaan, onko apina merellä
+                # Varmistetaan, että apinan kuva on olemassa
+                if not meri.coords(apina["apinan_kuva"]):
+                    print(f"Apina {apina_id} ei enää ole meressä.")
+                    return  # Lopetetaan, jos apinaa ei ole meressä
+                
+                # Liikutetaan apinaa suuntaan
+                if suunta == "pohjoinen":
+                    meri.move(apina["apinan_kuva"], 0, -nopeus)  # Ylös
+                elif suunta == "itä":
+                    meri.move(apina["apinan_kuva"], nopeus, 0)  # Oikealle
+                elif suunta == "etelä":
+                    meri.move(apina["apinan_kuva"], 0, nopeus)  # Alas
+                elif suunta == "länsi":
+                    meri.move(apina["apinan_kuva"], -nopeus, 0)  # Vasemmalle
+
+                # Tarkistetaan apinan sijainti (rajojen sisällä pysyminen)
+                apina_x, apina_y = meri.coords(apina["apinan_kuva"])[0:2]
+                if apina_x < -10 or apina_x > 1210 or apina_y < -10 or apina_y > 1210:
+                    eksyneet_apinat.add(apina_id)   # Lisätään eksyneet apinat listaan
+                    paivita_labelit()               # Päivitetään eksyneiden apinoiden lukumäärä
+                    print(f"Apina {apina_id} eksyi merelle!")
+                    return  # Lopetetaan apinan liikuttaminen, jos apina menee meren ulkopuolelle
+
+        time.sleep(0.5)  # Päivitysnopeus, joka määrittää liikkeen nopeuden
 
 # Funktio, joka siirtää yhden apinan saarelta merelle ja liikuttaa sitä suuntaan
 def laheta_apina_merelle(saari_id):
@@ -245,17 +348,16 @@ def laheta_apina_merelle(saari_id):
         
 # Funktio, joka liikuttaa apinaa meressä annettuun suuntaan
 def apina_liikkuu_meressa(apina_id, suunta):
-    global apinoiden_tiedot
-    global meri
+    global apinoiden_tiedot, meri
     nopeus = 5  # Apinan liikkumisnopeus (pikseliä per päivitys)
     
     # Apinan liikuttaminen merellä
     while ohjelma_kaynnissa:
-        for apina in apinoiden_tiedot:
-            if apina["apina_id"] == apina_id and apina["on_merella"]:
+        for apina in apinoiden_tiedot: 
+            if apina["apina_id"] == apina_id and apina["on_merella"]:   # Tarkistetaan, onko apina merellä
                 # Varmistetaan, että apinan kuva on olemassa
-                if not meri.coords(apina["apinan_kuva"]):
-                    print(f"Apina {apina_id} ei enää ole meressä.")
+                if not meri.coords(apina["apinan_kuva"]):               # Tarkistetaan, onko apinaa enää olemassa
+                    print(f"Apina {apina_id} ei enää ole meressä.")     # Tulostetaan viesti
                     return  # Lopetetaan, jos apinaa ei ole meressä
                 
                 # Liikutetaan apinaa suuntaan
@@ -274,19 +376,11 @@ def apina_liikkuu_meressa(apina_id, suunta):
 
                 # Tarkistetaan apinan sijainti (rajojen sisällä pysyminen)
                 apina_x, apina_y = meri.coords(apina["apinan_kuva"])[0:2]
-                if apina_x < 0 or apina_x > 1200 or apina_y < 0 or apina_y > 950:
-                    print(f"Apina {apina_id} on kadonnut merestä!")
+                if apina_x < -10 or apina_x > 1210 or apina_y < -10 or apina_y > 1210:
+                    print(f"Apina {apina_id} eksyi merelle!")
                     return  # Lopetetaan, jos apina menee meren ulkopuolelle
 
         time.sleep(0.05)  # Päivitysnopeus, joka määrittää liikkeen sujuvuuden
-
-
-# Funktio, joka lähettää apinat kaikilta saarilta paitsi S1 merelle
-def laheta_apinat_muualta_merelle():
-    global saarten_tiedot
-    for saari in saarten_tiedot:
-        if saari["saari_id"] != 1:  # Varmistetaan, että saari ei ole S1
-            laheta_apina_merelle(saari["saari_id"])
 
 # Funktio, joka päivittää saarella olevan apinoiden lukumäärän
 def paivita_apinoiden_maara_saarella(saari_id):
@@ -319,7 +413,7 @@ def lisaa_laiturit_saarelle(saari_id):
             meri.create_rectangle(saaren_x - 30, saaren_y + 70, saaren_x, saaren_y + 80, fill='gray')
 
             print(f"Laiturit lisätty saarelle {saari_id}")
-            kaynnista_autom_apina_uiminen()  # Käynnistetään automaattinen apinoiden uiminen saarelta
+            threading.Thread(target=apina_ui_merelle, args=(saari_id,), daemon=True).start()  # Käynnistetään automaattinen apinoiden uiminen saarelta
             break
 
 # Funktio, joka käynnistää satunnaisen apinan uimaan saarelta, jos matkailu on True
@@ -340,17 +434,10 @@ def apina_ui_merelle(saari_id):
                 # Lähetetään apina merelle
                 laheta_apina_merelle(saari_id)
                 # Soitetaan ääniefekti, kun apina lähtee uimaan
-                pygame.mixer.music.load("aanet/swim.wav")  # Lataa uimisen ääni
-                pygame.mixer.music.play()
+                swim_sound.play()  # Toistetaan ääni
 
         # Odotetaan 10 sekuntia ennen seuraavaa apinan uimista
         time.sleep(10)
-
-# Käynnistä apinan satunnainen uiminen saarelta
-def kaynnista_autom_apina_uiminen():
-    for saari in saarten_tiedot:
-        if saari["matkailu"]:  # Käynnistetään automaattinen uiminen vain saarella, jossa matkailu on käytössä
-            threading.Thread(target=apina_ui_merelle, args=(saari["saari_id"],), daemon=True).start()
 
 # Funktio, joka tarkistaa, osuuko apina saarelle uidessaan
 def tarkista_apinan_tormays_saarelle(apina_id):
@@ -378,6 +465,7 @@ def tarkista_apinan_tormays_saarelle(apina_id):
             apinan_kuva = saari["saari"].create_oval(apina_x, apina_y, apina_x+10, apina_y+10, fill='brown')  # Luodaan apinalle kuva
             apina["on_merella"] = False
             apina["saari_id"] = saari["saari_id"]
+            apina["saari"] = saari["saari"]
             apina["apinan_kuva"] = apinan_kuva
             apina["apina_x"], apina["apina_y"] = apina_x, apina_y  # Päivitetään apinan sijainti
             saari["apinoiden_lkm"] += 1
@@ -387,13 +475,8 @@ def tarkista_apinan_tormays_saarelle(apina_id):
             if not saari["matkailu"]:
                 saari["matkailu"] = True
                 threading.Thread(target=lisaa_laiturit_saarelle, args=(saari["saari_id"],), daemon=True).start()
-                # lisaa_laiturit_saarelle(saari["saari_id"])
-                # Käynnistetään apinoiden automaattinen uiminen
-                # threading.Thread(target=apina_ui_merelle, args=(saari["saari_id"],), daemon=True).start()
-
             return True  # Apina osui saarelle
     return False  # Apina ei osunut saarelle
-
 
 # Painikkeiden tyylit
 painikkeiden_tyyli = {
@@ -404,49 +487,40 @@ painikkeiden_tyyli = {
     "activeforeground": "white",   # Painikkeen aktivoitu tekstin väri
     "padx": 20,  # Lisätään tyhjää tilaa sivuille
     "pady": 10,  # Lisätään tyhjää tilaa ylös ja alas
-    "width": 15  # Asetetaan painikkeille vakio leveys
+    "width": 10  # Asetetaan painikkeille vakio leveys
 }
 
 # Luodaan painike, joka lisää saaren
 lisaa_saari_painike = tk.Button(ikkuna, text="Tulivuorenpurkaus", command=lisaa_saari, **painikkeiden_tyyli)
-# lisaa_saari_painike.place(x=0, y=0)
 lisaa_saari_painike.pack(side=tk.LEFT, anchor='n')
 
 # Luodaan painike, joka tyhjentää meren saarista
 tyhjenna_meri_painike = tk.Button(ikkuna, text="Tyhjennä meri", command=tyhjenna_meri, **painikkeiden_tyyli)
 tyhjenna_meri_painike.pack(side=tk.LEFT, anchor='n')
 
-# Luodaan painike "Apina merelle S1", joka lähettää yhden apinan saarelta 1 merelle
-apina_merelle_S1_painike = tk.Button(ikkuna, text="Apina merelle S1", command=lambda: laheta_apina_merelle(1), **painikkeiden_tyyli)
-apina_merelle_S1_painike.pack(side=tk.LEFT, anchor='n')
-
 # Luodaan painike "Apinat merelle", joka lähettää yhden apinan kaikilta muilta saarilta merelle
-apinat_merelle_painike = tk.Button(ikkuna, text="Apinat merelle", command=laheta_apinat_muualta_merelle, **painikkeiden_tyyli)
+apinat_merelle_painike = tk.Button(ikkuna, text="Apinat uimaan", command=laheta_apina_merelle_2, **painikkeiden_tyyli)
 apinat_merelle_painike.pack(side=tk.LEFT, anchor='n')
 
 # Luodaan painike, joka lisää laiturit saarelle S1
 lisaa_laiturit_S1_painike = tk.Button(ikkuna, text="Lisää laiturit S1", command=lambda: lisaa_laiturit_saarelle(1), **painikkeiden_tyyli)
 lisaa_laiturit_S1_painike.pack(side=tk.LEFT, anchor='n')
 
-# Luodaan painike, joka asettaa saarelle S1 matkailun päälle
-matkailu_S1_painike = tk.Button(ikkuna, text="Matkailu S1", command=lambda: saarten_tiedot[0].update({"matkailu": True}), **painikkeiden_tyyli)
-matkailu_S1_painike.pack(side=tk.LEFT, anchor='n')
+# Luodaan painike, joka tulostaa saarten tiedot
+saarten_tiedot_painike = tk.Button(ikkuna, text="Saarten tiedot", command=lambda: print(saarten_tiedot), **painikkeiden_tyyli)
+saarten_tiedot_painike.pack(side=tk.LEFT, anchor='n')
+
+# # Luodaan painike, joka asettaa saarelle S1 matkailun päälle
+# matkailu_S1_painike = tk.Button(ikkuna, text="Matkailu S1", command=lambda: saarten_tiedot[0].update({"matkailu": True}), **painikkeiden_tyyli)
+# matkailu_S1_painike.pack(side=tk.LEFT, anchor='n')
 
 # # Luodaan painike, joka tulostaa vain apinoiden id:t
 # apinoiden_id_painike = tk.Button(ikkuna, text="Apinoiden id:t", command=lambda: print([apina["apina_id"] for apina in apinoiden_tiedot]), **painikkeiden_tyyli)
 # apinoiden_id_painike.pack(side=tk.LEFT, anchor='n')
 
-# # Luodaan painike, joka tulostaa saarten tiedot
-# saarten_tiedot_painike = tk.Button(ikkuna, text="Saarten tiedot", command=lambda: print(saarten_tiedot), **painikkeiden_tyyli)
-# saarten_tiedot_painike.pack(side=tk.LEFT, anchor='n')
-
 # # Luodaan painike, joka tulostaa apinoiden tiedot
 # apinoiden_tiedot_painike = tk.Button(ikkuna, text="Apinoiden tiedot", command=lambda: print(apinoiden_tiedot), **painikkeiden_tyyli)
 # apinoiden_tiedot_painike.pack(side=tk.LEFT, anchor='n')
-
-# # Luodaan joka näyttää merellä olevien apinoiden id:t
-# meren_apinoiden_id_painike = tk.Button(ikkuna, text="Merellä olevien apinoiden id:t", command=lambda: print([apina["apina_id"] for apina in apinoiden_tiedot if apina["on_merella"]]), **painikkeiden_tyyli)
-# meren_apinoiden_id_painike.pack(side=tk.LEFT, anchor='n')
 
 # Lopetusfunktio, joka pysäyttää säikeet ja sulkee ohjelman, kun ikkuna suljetaan
 def lopeta_ohjelma():
@@ -456,6 +530,13 @@ def lopeta_ohjelma():
 
 # Käytetään `protocol`-metodia pysäyttämään säikeet ja sulkemaan ikkuna oikein
 ikkuna.protocol("WM_DELETE_WINDOW", lopeta_ohjelma)
+
+# Funktio, joka päivittää hain syömät ja nauruun kuolleet apinat
+def paivita_labelit():
+    global hain_syomat_label, nauruun_kuolleet_label, eksyneet_apinat_label, hain_syomat, nauruun_kuolleet, eksyneet_apinat 
+    nauruun_kuolleet_label.config(text=f"Nauruun kuolleet apinat: {len(nauruun_kuolleet)}")
+    hain_syomat_label.config(text=f"Hain syömät apinat: {len(hain_syomat)}")
+    eksyneet_apinat_label.config(text=f"Eksyneet apinat: {len(eksyneet_apinat)}")
 
 # Käynnistä ohjelma
 ikkuna.mainloop()
